@@ -21,6 +21,7 @@ def main():
     session = requests.Session()
 
     # 1. Authorization (API v1)
+    print(f"Try loggin for: {USERNAME}")
     login_url = f"https://api.myshows.me/profile/login?login={USERNAME}&password={get_md5(PASSWORD)}"
     auth_resp = session.get(login_url)
 

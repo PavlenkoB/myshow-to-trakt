@@ -11,9 +11,13 @@ A tool to export your watched shows history from MyShows to a CSV format compati
 
 1.  Clone the repository.
 2.  Install dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # macOS/Linux
+pip install -r requirements.txt
+```
+
 3.  Create a `.env` file based on the template:
     ```env
     MYSHOWS_USERNAME=your_username
