@@ -1,40 +1,53 @@
-Your CSV file should contain a header row followed by one row per item to import.
+# Trakt CSV Import Instructions
 
-Поля
-id
-The ID can be a Trakt ID, IMDB ID, or TMDB ID. For TV shows it can also be a TVDB ID.
+This guide describes the expected format for importing your TV show data into Trakt.tv using the official CSV importer.
 
-Prefix with the service name: trakt_id, imdb_id, tmdb_id, tvdb_id
+## Supported Column Headers
 
-type
-Specifies what the ID refers to. Optional but recommended.
+To ensure accurate matching and metadata processing, your CSV should use the following headers. The order of columns does not matter.
 
-Values: movie ,episode ,show ,season
+| Header           | Description                                                          | Required              | Example                |
+|:-----------------|:---------------------------------------------------------------------|:----------------------|:-----------------------|
+| `imdb_id`        | IMDb ID (starts with `tt`). Best for 100% accuracy.                  | Highly Recommended    | `tt0439100`            |
+| `type`           | The type of entry: `show`, `season`, or `episode`.                   | Highly Recommended    | `episode`              |
+| `title`          | Title of the show.                                                   | Recommended           | `Breaking Bad`         |
+| `season`         | Season number (numeric).                                             | Required for episodes | `1`                    |
+| `episode`        | Episode number (numeric).                                            | Required for episodes | `5`                    |
+| `watchlisted_at` | Date and time the item was added to your watchlist. ISO 8601 format. | For History           | `2024-12-17T12:00:00Z` |
+| `watched_at`     | Watch timestamp in ISO 8601 format.                                  | For History           | `2024-12-17T12:00:00Z` |
+| `rating`         | Your rating on a scale of 1–10.                                      | Optional              | `10`                   |
 
-watched_at
-optional
-Date and time the item was watched. ISO 8601 format.
+## Key Requirements
 
-Can be "unknown" to import with an unknown watch date. Omit if only adding to watchlist.
+### 1. Timestamps
 
-watchlisted_at
-optional
-Date and time the item was added to your watchlist. ISO 8601 format.
+All dates (like `watched_at`) must follow the **ISO 8601** standard.
 
-Omit if only marking as watched.
+* **Format:** `YYYY-MM-DDTHH:MM:SSZ`
+* **Note:** If the specific time is unknown, the exporter defaults to `12:00:00.000Z` (noon UTC).
 
-rating
-optional
-Rating for the item. Must be a value from 1 to 10.
+### 2. ID Priority
 
-rated_at
-optional
-Date and time the item was rated. ISO 8601 format.
+Trakt uses multiple IDs for matching. If multiple are provided, it usually prioritizes them as follows:
+`trakt_id` > `imdb_id` > `tmdb_id` > `tvdb_id`.
 
-Only parsed if a rating is also present.
+### 3. History vs. Watchlist
 
-Приклад
+* **History Import:** Any row containing a value in the `watched_at` column will be imported into your **History**.
+* **Watchlist Import:** Rows where `type` is `show` and `watched_at` is empty will be added to your **Watchlist**.
+
+## Sample CSV Structure
+
+```csv
 imdb_id,type,watched_at,watchlisted_at,rating,rated_at
 tt0068646,movie,2024-10-25T20:00:00Z,2024-10-01T10:00:00Z,7,2024-10-25T21:00:00Z
 tt15239678,movie,,2024-04-30T11:00:00Z,,
 tt4281724,movie,2024-01-12T02:00:00Z,,,
+```
+
+## How to Import
+
+1. Go to [trakt.tv/import](https://trakt.tv/import).
+2. Choose the **CSV** import option.
+3. Upload your `tmp/myshows_export.csv`.
+4. Review the matched items and confirm the import.

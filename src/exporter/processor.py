@@ -167,8 +167,11 @@ class DataProcessor:
         total_rows = 0
         for sid in active_ids:
             str_sid = str(sid)
-            total_rows += len(episodes_data.get(str_sid, []))
-            if shows_data.get(str_sid, {}).get('watchStatus') == 'later':
+            watched_eps = episodes_data.get(str_sid, [])
+            total_rows += len(watched_eps)
+            
+            # Only add a watchlist row if it's 'later' AND we haven't watched any episodes
+            if shows_data.get(str_sid, {}).get('watchStatus') == 'later' and not watched_eps:
                 total_rows += 1
         
         if total_rows == 0:
@@ -178,15 +181,18 @@ class DataProcessor:
         print(f"[*] Stage 4: Exporting {total_rows} items to CSV...")
         pbar = tqdm(total=total_rows, desc="Exporting")
         
+        current_time_iso = datetime.now().strftime("%Y-%m-%dT12:00:00.000Z")
+
         for show_id_int in active_ids:
             show_id = str(show_id_int)
             meta = shows_data.get(show_id, {})
             title = meta.get('title')
             imdb_id = meta.get('imdb_id') or self.cache.get(show_id)
             rating = (meta.get('rating', 0) * 2) if meta.get('rating') else ''
+            watched_eps = episodes_data.get(show_id, [])
             
             # Episodes
-            for ep in episodes_data.get(show_id, []):
+            for ep in watched_eps:
                 watched_at = ""
                 if ep.get('date'):
                     try:
@@ -202,12 +208,13 @@ class DataProcessor:
                     'season': ep.get('s', ''),
                     'episode': ep.get('e', ''),
                     'watched_at': watched_at,
+                    'watchlisted_at': watched_at,
                     'rating': rating
                 })
                 pbar.update(1)
             
-            # Watchlist
-            if meta.get('watchStatus') == 'later':
+            # Watchlist (Only if later AND no episodes)
+            if meta.get('watchStatus') == 'later' and not watched_eps:
                 export_data.append({
                     'imdb_id': imdb_id or '',
                     'title': title,
@@ -215,13 +222,14 @@ class DataProcessor:
                     'season': '',
                     'episode': '',
                     'watched_at': '',
+                    'watchlisted_at': current_time_iso,
                     'rating': ''
                 })
                 pbar.update(1)
         pbar.close()
 
         with open(csv_filename, mode='w', newline='', encoding='utf-8') as f:
-            fieldnames = ['imdb_id', 'title', 'type', 'season', 'episode', 'watched_at', 'rating']
+            fieldnames = ['imdb_id', 'title', 'type', 'season', 'episode', 'watched_at', 'watchlisted_at', 'rating']
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             for row in export_data:
