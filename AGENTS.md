@@ -1,17 +1,42 @@
-# AI Agent Directives[cite: 1]
+# AI Agent Directives
 
-* Instructions for AI development tools (e.g., Cursor, or Kimi Claw if adopted) interacting with this codebase[cite: 1].
+These instructions are for AI development tools interacting with this codebase.
 
-## Project Scope[cite: 1]
-* **Purpose:** Maintain and optimize the MyShows to Trakt data migration tool[cite: 1].
-* **Stack:** Python 3, `requests`[cite: 1].
+## Project Scope
+* **Purpose:** Maintain and optimize the MyShows to Trakt data migration tool.
+* **Stack:** Python 3, `requests`, `beautifulsoup4`, `tqdm`.
+* **Standard:** Follow the conventions defined in [GEMINI.md](GEMINI.md).
 
-## Agent Constraints[cite: 1]
-* Format all outputs and documentation using bullet points[cite: 1].
-* Keep explanations and code changes short and concise[cite: 1].
-* Minimize third-party dependencies; rely on standard Python libraries when possible[cite: 1].
-* Handle API errors and edge cases (e.g., missing dates, failed auth) silently but safely[cite: 1].
-* Do not introduce heavy architectural patterns for simple scripts[cite: 1].
+## Agent Constraints
+* Format all outputs and documentation using bullet points.
+* Keep explanations and code changes short and concise.
+* Minimize third-party dependencies; rely on standard Python libraries when possible.
+* Handle API errors and edge cases (e.g., missing dates, failed auth) silently but safely.
+* Do not introduce heavy architectural patterns for simple scripts.
+
+## Project Standards & Conventions
+
+### 1. Data Processing
+* **IMDb IDs:** Must always be prefixed with `tt` and padded to at least 7 digits (e.g., `tt0439100`).
+* **Ratings:** Scale conversion from MyShows (1-5) to Trakt (1-10) is handled by multiplying by 2.
+* **Timestamps:** All timestamps must follow ISO 8601 format (`YYYY-MM-DDTHH:MM:SS.000Z`).
+
+### 2. CSV Export Format
+* The export follows the official Trakt CSV import schema.
+* **Columns:** `imdb_id`, `title`, `type`, `season`, `episode`, `watched_at`, `watchlisted_at`, `rating`.
+* **Watchlist Logic:** `type=show` entries are only created if the show status is `later` AND no episodes have been watched.
+* **Watchlisted At:** For episodes, `watchlisted_at` matches `watched_at`. For watchlist shows, it defaults to the current date/time.
+
+### 3. Caching & Persistence
+* All caches and temporary data reside in `tmp/`.
+* `imdb_cache.json`: Global fallback for scraped IMDb IDs.
+* `tvshow_state_cache.json`: Show-level metadata (includes `ep_map`).
+* `tvshow_episode_cache.json`: Per-show watched episode history.
+
+### 4. Configuration
+* Use `.env` for all sensitive credentials and runtime limits.
+* `EXPORT_LIMIT`: Limits the number of shows processed (useful for debugging).
+* `CSV_SPLIT_SIZE`: Splits the final CSV into multiple parts (e.g., `_part_1.csv`).
 
 ## Reference Documentation
 * [Documentation Overview](docs/README.md): Entry point for all technical documentation.
