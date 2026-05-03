@@ -90,9 +90,15 @@ class DataProcessor:
                                 'e': ep.get('episodeNumber')
                             }
                     
+                    # Extract IMDb ID if present
                     imdb_id = meta.get('imdbId')
-                    if imdb_id and not str(imdb_id).startswith('tt'):
-                        imdb_id = f"tt{imdb_id}"
+                    if imdb_id:
+                        imdb_str = str(imdb_id)
+                        if not imdb_str.startswith('tt'):
+                            # Pad to 7 digits (standard IMDb ID length)
+                            imdb_id = f"tt{imdb_str.zfill(7)}"
+                        else:
+                            imdb_id = imdb_str
                     
                     shows_data[str_sid] = {
                         'title': meta.get('title'),
