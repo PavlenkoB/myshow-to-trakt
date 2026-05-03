@@ -26,3 +26,20 @@ class IMDbCache:
     def set(self, show_id, imdb_id):
         self.data[str(show_id)] = imdb_id
         self.save()
+
+class StateCache:
+    def __init__(self, filename):
+        self.filename = filename
+
+    def load(self):
+        if os.path.exists(self.filename):
+            try:
+                with open(self.filename, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError):
+                return None
+        return None
+
+    def save(self, data):
+        with open(self.filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)

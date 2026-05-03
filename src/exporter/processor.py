@@ -1,111 +1,207 @@
 import csv
+import time
 from datetime import datetime
 from tqdm import tqdm
 
 class DataProcessor:
-    def __init__(self, session, scraper, cache):
+    def __init__(self, session, scraper, cache, state_cache, episode_cache):
         self.session = session
         self.scraper = scraper
-        self.cache = cache
+        self.cache = cache # IMDb cache
+        self.state_cache = state_cache # Show metadata cache
+        self.episode_cache = episode_cache # Watched episodes cache
 
-    def fetch_shows(self):
-        print("[*] Fetching shows from MyShows...")
-        # /profile/shows/all/ often returns a more complete list than /profile/shows/
+    def fetch_show_list(self):
+        print("[*] Fetching library from MyShows...")
         resp = self.session.get("https://api.myshows.me/profile/shows/")
         if resp.status_code != 200:
             return None
-        data = resp.json()
-        
-        # Try to supplement with 'all' if possible
+        return resp.json()
+
+    def fetch_metadata(self, show_id):
+        # No trailing slash for general metadata
+        url = f"https://api.myshows.me/shows/{show_id}"
         try:
-            resp_all = self.session.get("https://api.myshows.me/profile/shows/all/")
-            if resp_all.status_code == 200:
-                data_all = resp_all.json()
-                if isinstance(data_all, dict):
-                    data.update(data_all)
+            time.sleep(0.3)
+            resp = self.session.get(url)
+            if resp.status_code == 200:
+                return resp.json()
         except Exception:
             pass
-            
-        return data
+        return None
 
-    def process_all(self, csv_filename):
-        shows_data = self.fetch_shows()
-        if not shows_data:
-            print("[-] Failed to fetch shows list.")
+    def fetch_watched_details(self, show_id):
+        # With trailing slash for user-specific watched list
+        url = f"https://api.myshows.me/profile/shows/{show_id}/"
+        try:
+            time.sleep(0.3)
+            resp = self.session.get(url)
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception:
+            pass
+        return None
+
+    def process_all(self, csv_filename, limit=None):
+        # 1. Load Caches
+        shows_data = self.state_cache.load() or {}
+        episodes_data = self.episode_cache.load() or {}
+
+        # 2. Sync Show List
+        base_list_full = self.fetch_show_list()
+        if not base_list_full:
+            print("[-] Failed to fetch show list.")
             return
 
-        # Summary of statuses
+        # Apply limit if set
+        if limit and isinstance(limit, int):
+            print(f"[*] Applying export limit: {limit} shows.")
+            # Sort by ID to have deterministic behavior
+            limited_ids = sorted(base_list_full.keys(), key=int)[:limit]
+            base_list = {sid: base_list_full[sid] for sid in limited_ids}
+        else:
+            base_list = base_list_full
+
+        # Stage 1: Show Metadata (Title, IMDb, Episode Map)
         stats = {}
-        for s in shows_data.values():
+        for s in base_list.values():
             status = s.get('watchStatus', 'unknown')
             stats[status] = stats.get(status, 0) + 1
-        print(f"[*] Found shows by status: {stats}")
+        print(f"[*] Library summary: {stats}")
 
-        # Stage 1: Metadata Enrichment
-        print("[*] Stage 1: Metadata Enrichment (IMDb IDs)")
-        show_ids = sorted(shows_data.keys())
-        
-        # Filter shows that need scraping
-        needs_scraping = [sid for sid in show_ids if not self.cache.get(sid)]
-        if needs_scraping:
-            for show_id in tqdm(needs_scraping, desc="Scraping IMDb"):
+        to_fetch_meta = []
+        for sid in base_list:
+            str_sid = str(sid)
+            # Fetch if not in cache OR if ep_map is missing
+            if str_sid not in shows_data or 'ep_map' not in shows_data[str_sid]:
+                to_fetch_meta.append(sid)
+
+        if to_fetch_meta:
+            print(f"[*] Stage 1: Syncing metadata for {len(to_fetch_meta)} shows...")
+            for show_id in tqdm(to_fetch_meta, desc="Metadata"):
+                meta = self.fetch_metadata(show_id)
+                if meta:
+                    str_sid = str(show_id)
+                    ep_map = {}
+                    if 'episodes' in meta and isinstance(meta['episodes'], dict):
+                        for eid, ep in meta['episodes'].items():
+                            ep_map[str(eid)] = {
+                                's': ep.get('seasonNumber'),
+                                'e': ep.get('episodeNumber')
+                            }
+                    
+                    imdb_id = meta.get('imdbId')
+                    if imdb_id and not str(imdb_id).startswith('tt'):
+                        imdb_id = f"tt{imdb_id}"
+                    
+                    shows_data[str_sid] = {
+                        'title': meta.get('title'),
+                        'imdb_id': imdb_id,
+                        'watchStatus': base_list[str_sid].get('watchStatus'),
+                        'rating': base_list[str_sid].get('rating'),
+                        'ep_map': ep_map
+                    }
+                    
+                    if len(shows_data) % 10 == 0:
+                        self.state_cache.save(shows_data)
+            self.state_cache.save(shows_data)
+        else:
+            print("[+] Show metadata is up to date.")
+
+        # Stage 2: Watched Episodes (Matching IDs to S/E)
+        to_fetch_watched = []
+        for sid in base_list:
+            str_sid = str(sid)
+            # Fetch if missing OR if empty list (but show has history)
+            watched_count = base_list[str_sid].get('watchedEpisodes', 0)
+            if str_sid not in episodes_data or (not episodes_data[str_sid] and watched_count > 0):
+                to_fetch_watched.append(sid)
+
+        if to_fetch_watched:
+            print(f"[*] Stage 2: Syncing watched episodes for {len(to_fetch_watched)} shows...")
+            for show_id in tqdm(to_fetch_watched, desc="Episodes"):
+                watched_dict = self.fetch_watched_details(show_id)
+                if watched_dict:
+                    str_sid = str(show_id)
+                    matched_eps = []
+                    show_meta = shows_data.get(str_sid, {})
+                    ep_map = show_meta.get('ep_map', {})
+                    
+                    if isinstance(watched_dict, dict):
+                        for eid, info in watched_dict.items():
+                            mapping = ep_map.get(str(eid))
+                            if mapping:
+                                matched_eps.append({
+                                    's': mapping['s'],
+                                    'e': mapping['e'],
+                                    'date': info.get('watchDate')
+                                })
+                    
+                    episodes_data[str_sid] = matched_eps
+                    
+                    if len(episodes_data) % 10 == 0:
+                        self.episode_cache.save(episodes_data)
+            self.episode_cache.save(episodes_data)
+        else:
+            print("[+] Episode history is up to date.")
+
+        # Stage 3: IMDb Fallback (Scraper)
+        to_scrape = [sid for sid in base_list if not shows_data.get(str(sid), {}).get('imdb_id') and not self.cache.get(sid)]
+        if to_scrape:
+            print(f"[*] Stage 3: Scraping missing IMDb IDs for {len(to_scrape)} shows...")
+            for show_id in tqdm(to_scrape, desc="Scraping"):
                 imdb_id = self.scraper.get_imdb_id(show_id)
                 if imdb_id:
                     self.cache.set(show_id, imdb_id)
-        else:
-            print("[+] All IMDb IDs are already cached.")
 
-        # Stage 2: Data Transformation & Export
+        # Stage 4: CSV Export
         export_data = []
-        total_episodes = 0
+        active_ids = sorted(base_list.keys(), key=int)
         
-        # Count total episodes first for accurate progress bar
-        for show_id in show_ids:
-            info = shows_data[show_id]
-            if 'episodes' in info and info['episodes']:
-                total_episodes += len(info['episodes'])
-            if info.get('watchStatus') == 'later':
-                total_episodes += 1
-
-        if total_episodes == 0:
-            print("[-] No episodes or watchlist items to export.")
+        total_rows = 0
+        for sid in active_ids:
+            str_sid = str(sid)
+            total_rows += len(episodes_data.get(str_sid, []))
+            if shows_data.get(str_sid, {}).get('watchStatus') == 'later':
+                total_rows += 1
+        
+        if total_rows == 0:
+            print("[-] No items to export.")
             return
 
-        print(f"[*] Stage 2: Exporting {total_episodes} items to CSV...")
-        pbar = tqdm(total=total_episodes, desc="Exporting")
-
-        for show_id in show_ids:
-            info = shows_data[show_id]
-            title = info.get('title')
-            imdb_id = self.cache.get(show_id)
-            watch_status = info.get('watchStatus')
-            rating = (info.get('rating', 0) * 2) if info.get('rating') else ''
-
-            # Episodes (History)
-            if 'episodes' in info and info['episodes']:
-                for ep in info['episodes']:
-                    watched_at = ""
-                    raw_date = ep.get('watchDate')
-                    if raw_date:
-                        try:
-                            dt = datetime.strptime(raw_date, "%d.%m.%Y")
-                            watched_at = dt.strftime("%Y-%m-%dT12:00:00.000Z")
-                        except ValueError:
-                            pass
-                    
-                    export_data.append({
-                        'imdb_id': imdb_id or '',
-                        'title': title,
-                        'type': 'episode',
-                        'season': ep.get('seasonNumber', 1),
-                        'episode': ep.get('episodeNumber', 1),
-                        'watched_at': watched_at,
-                        'rating': rating
-                    })
-                    pbar.update(1)
+        print(f"[*] Stage 4: Exporting {total_rows} items to CSV...")
+        pbar = tqdm(total=total_rows, desc="Exporting")
+        
+        for show_id_int in active_ids:
+            show_id = str(show_id_int)
+            meta = shows_data.get(show_id, {})
+            title = meta.get('title')
+            imdb_id = meta.get('imdb_id') or self.cache.get(show_id)
+            rating = (meta.get('rating', 0) * 2) if meta.get('rating') else ''
             
-            # Watchlist (if status is 'later')
-            elif watch_status == 'later':
+            # Episodes
+            for ep in episodes_data.get(show_id, []):
+                watched_at = ""
+                if ep.get('date'):
+                    try:
+                        dt = datetime.strptime(ep['date'], "%d.%m.%Y")
+                        watched_at = dt.strftime("%Y-%m-%dT12:00:00.000Z")
+                    except ValueError:
+                        pass
+                
+                export_data.append({
+                    'imdb_id': imdb_id or '',
+                    'title': title,
+                    'type': 'episode',
+                    'season': ep.get('s', ''),
+                    'episode': ep.get('e', ''),
+                    'watched_at': watched_at,
+                    'rating': rating
+                })
+                pbar.update(1)
+            
+            # Watchlist
+            if meta.get('watchStatus') == 'later':
                 export_data.append({
                     'imdb_id': imdb_id or '',
                     'title': title,
@@ -116,10 +212,8 @@ class DataProcessor:
                     'rating': ''
                 })
                 pbar.update(1)
-
         pbar.close()
 
-        # Write CSV
         with open(csv_filename, mode='w', newline='', encoding='utf-8') as f:
             fieldnames = ['imdb_id', 'title', 'type', 'season', 'episode', 'watched_at', 'rating']
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -127,4 +221,4 @@ class DataProcessor:
             for row in export_data:
                 writer.writerow(row)
 
-        print(f"[+] Export finished! Saved to {csv_filename}")
+        print(f"[+] Done! Saved to {csv_filename}")

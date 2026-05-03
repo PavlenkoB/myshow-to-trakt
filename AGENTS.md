@@ -14,6 +14,7 @@
 * Do not introduce heavy architectural patterns for simple scripts[cite: 1].
 
 ## Reference Documentation
+* [Documentation Overview](docs/README.md): Entry point for all technical documentation.
+* [MyShows API Endpoints](docs/myshow/README.md): Detailed guide to the legacy v1 endpoints used by this tool.
 * [Migration Plan](MIGRATION_PLAN.md): Roadmap for data export and import strategies.
-* [MyShows API Swagger](docs/myshows_swagger.json): Specification for the MyShows JSON-RPC 2.0 API.
 * [Trakt CSV Import Instructions](docs/trakt_csv_instruction.md): Format requirements for importing data into Trakt via CSV.
