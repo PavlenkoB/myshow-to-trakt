@@ -14,27 +14,23 @@ Export user show data (History and Watch Later) from MyShows to a Trakt-compatib
 
 ## Implementation Steps
 
-### Phase 1: Environment & Auth
-- [x] Add `beautifulsoup4` and `lxml` to `requirements.txt`.
-- [x] Update `.env` to support `MYSHOWS_COOKIE` as an optional override for credentials.
-- [x] Implement a `SessionManager` class to handle login and cookie-based auth.
+### Phase 1: Modularization (src/exporter/)
+- [x] Create `src/exporter/session.py`: `SessionManager` class for authentication.
+- [x] Create `src/exporter/scraper.py`: `IMDbScraper` class for web scraping.
+- [x] Create `src/exporter/cache.py`: `IMDbCache` class for persistence.
+- [x] Create `src/exporter/processor.py`: Main processing logic, including transformation and progress tracking.
+- [x] Refactor `myshows_exporter.py` to use these modules.
 
-### Phase 2: Data Extraction
-- [x] Fetch the full user show list using `https://api.myshows.me/profile/shows/`.
-- [x] Implement a caching mechanism (temporary JSON file) to store scraped IMDb IDs so the script can be resumed if interrupted.
-- [x] Implement `Scraper` module:
-    *   Visit `https://myshows.me/view/<show_id>/`.
-    *   Extract English title and `imdb_id` from the page source.
-    *   **Rate Limiting:** Add a 1.5s delay between page requests.
+### Phase 2: Progress Tracking & Robustness
+- [x] Implement dual-stage progress:
+    1.  **Metadata Stage:** Scraping IMDb IDs (Shows).
+    2.  **Export Stage:** Writing episodes to CSV (Total Episodes progress bar).
+- [x] Ensure `IMDbCache` strictly reuses existing entries before attempting any network call.
 
-### Phase 3: Trakt CSV Generation
-- [x] Map MyShows data to Trakt CSV columns:
-    *   `imdb_id`: Extracted via scraper.
-    *   `type`: `episode` for history, `show` for watchlist.
-    *   `watched_at`: ISO format (defaulting to noon if time is missing).
-    *   `rating`: MyShows rating * 2.
-    *   `season` / `episode`: From v1 API data.
-- [x] Export "Watch Later" shows as a separate CSV or combined rows with `type=show` and no `watched_at` date.
+### Phase 3: Show Category Fixes
+- [x] Update logic to handle all `watchStatus` values: `watching`, `later`, `finished`, `cancelled`.
+- [x] Supplement data with `/profile/shows/all/` to ensure "Released" (Finished) shows are included.
+- [x] Log a summary of shows found by status to help debug if anything is missing.
 
 ### Phase 4: Documentation & Cleanup
 - [x] Update `README.md` with instructions on how to find the session cookie in Chrome/Firefox.
@@ -46,6 +42,6 @@ Export user show data (History and Watch Later) from MyShows to a Trakt-compatib
 *   **API v1 Limitations:** Used only for the initial list; metadata is enriched via scraping.
 
 ## Verification
-- [x] Run script for a single show and verify CSV output. (Verified scraping logic against public page).
-- [x] Verify `imdb_id` extraction works for a known show. (Verified `tt33204697` for show `91074`).
-- [ ] Final run: Generate `myshows_export.csv` and verify it contains both episodes and "Watch Later" items.
+- [x] Verify that running `myshows_exporter.py` correctly imports from `src.exporter`.
+- [x] Check `imdb_cache.json` to confirm it is updated but not overwritten.
+- [x] Compare CSV row count against MyShows profile counts.
