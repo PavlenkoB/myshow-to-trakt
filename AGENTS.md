@@ -23,9 +23,10 @@ These instructions are for AI development tools interacting with this codebase.
 
 ### 2. CSV Export Format
 * The export follows the official Trakt CSV import schema.
-* **Columns:** `imdb_id`, `title`, `type`, `season`, `episode`, `watched_at`, `watchlisted_at`, `rating`.
+* **Columns:** `imdb_id`, `type`, `watched_at`, `watchlisted_at`, `rating`, `rated_at`, `title`, `season`, `episode`.
 * **Watchlist Logic:** `type=show` entries are only created if the show status is `later` AND no episodes have been watched.
 * **Watchlisted At:** For episodes, `watchlisted_at` matches `watched_at`. For watchlist shows, it defaults to the current date/time.
+* **Rated At:** For episodes with a rating, `rated_at` matches `watched_at`.
 
 ### 3. Caching & Persistence
 * All caches and temporary data reside in `tmp/`.

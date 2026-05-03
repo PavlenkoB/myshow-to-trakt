@@ -211,7 +211,8 @@ class DataProcessor:
                     'episode': ep.get('e', ''),
                     'watched_at': watched_at,
                     'watchlisted_at': watched_at,
-                    'rating': rating
+                    'rating': rating,
+                    'rated_at': watched_at if rating else ''
                 })
                 pbar.update(1)
             
@@ -225,12 +226,13 @@ class DataProcessor:
                     'episode': '',
                     'watched_at': '',
                     'watchlisted_at': current_time_iso,
-                    'rating': ''
+                    'rating': '',
+                    'rated_at': ''
                 })
                 pbar.update(1)
         pbar.close()
 
-        fieldnames = ['imdb_id', 'title', 'type', 'season', 'episode', 'watched_at', 'watchlisted_at', 'rating']
+        fieldnames = ['imdb_id', 'type', 'watched_at', 'watchlisted_at', 'rating', 'rated_at', 'title', 'season', 'episode']
 
         if split_size and split_size > 0:
             print(f"[*] Splitting CSV into parts of {split_size} rows...")
