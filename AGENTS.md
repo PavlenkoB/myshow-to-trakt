@@ -12,3 +12,8 @@
 * Minimize third-party dependencies; rely on standard Python libraries when possible[cite: 1].
 * Handle API errors and edge cases (e.g., missing dates, failed auth) silently but safely[cite: 1].
 * Do not introduce heavy architectural patterns for simple scripts[cite: 1].
+
+## Reference Documentation
+* [Migration Plan](MIGRATION_PLAN.md): Roadmap for data export and import strategies.
+* [MyShows API Swagger](docs/myshows_swagger.json): Specification for the MyShows JSON-RPC 2.0 API.
+* [Trakt CSV Import Instructions](docs/trakt_csv_instruction.md): Format requirements for importing data into Trakt via CSV.
