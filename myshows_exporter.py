@@ -13,6 +13,7 @@ USERNAME = os.getenv('MYSHOWS_USERNAME')
 PASSWORD = os.getenv('MYSHOWS_PASSWORD')
 SESSION_COOKIE = os.getenv('MYSHOWS_COOKIE')
 EXPORT_LIMIT = os.getenv('EXPORT_LIMIT')
+CSV_SPLIT_SIZE = os.getenv('CSV_SPLIT_SIZE')
 CSV_FILENAME = 'tmp/myshows_export.csv'
 CACHE_FILENAME = 'tmp/imdb_cache.json'
 STATE_CACHE_FILENAME = 'tmp/tvshow_state_cache.json'
@@ -36,7 +37,8 @@ def main():
 
     # 3. Process export
     limit = int(EXPORT_LIMIT) if EXPORT_LIMIT and EXPORT_LIMIT.isdigit() else None
-    processor.process_all(CSV_FILENAME, limit=limit)
+    split_size = int(CSV_SPLIT_SIZE) if CSV_SPLIT_SIZE and CSV_SPLIT_SIZE.isdigit() else None
+    processor.process_all(CSV_FILENAME, limit=limit, split_size=split_size)
 
 if __name__ == "__main__":
     main()

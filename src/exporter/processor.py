@@ -42,11 +42,11 @@ class DataProcessor:
             pass
         return None
 
-    def process_all(self, csv_filename, limit=None):
+    def process_all(self, csv_filename, limit=None, split_size=None):
         # 1. Load Caches
         shows_data = self.state_cache.load() or {}
         episodes_data = self.episode_cache.load() or {}
-
+        
         # 2. Sync Show List
         base_list_full = self.fetch_show_list()
         if not base_list_full:
@@ -62,13 +62,14 @@ class DataProcessor:
         else:
             base_list = base_list_full
 
-        # Stage 1: Show Metadata (Title, IMDb, Episode Map)
+        # Summary of statuses (from base_list)
         stats = {}
         for s in base_list.values():
             status = s.get('watchStatus', 'unknown')
             stats[status] = stats.get(status, 0) + 1
         print(f"[*] Library summary: {stats}")
 
+        # Stage 1: Show Metadata (Title, IMDb, Episode Map)
         to_fetch_meta = []
         for sid in base_list:
             str_sid = str(sid)
@@ -82,6 +83,7 @@ class DataProcessor:
                 meta = self.fetch_metadata(show_id)
                 if meta:
                     str_sid = str(show_id)
+                    # Create a lean version of metadata
                     ep_map = {}
                     if 'episodes' in meta and isinstance(meta['episodes'], dict):
                         for eid, ep in meta['episodes'].items():
@@ -228,11 +230,26 @@ class DataProcessor:
                 pbar.update(1)
         pbar.close()
 
-        with open(csv_filename, mode='w', newline='', encoding='utf-8') as f:
-            fieldnames = ['imdb_id', 'title', 'type', 'season', 'episode', 'watched_at', 'watchlisted_at', 'rating']
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            for row in export_data:
-                writer.writerow(row)
+        fieldnames = ['imdb_id', 'title', 'type', 'season', 'episode', 'watched_at', 'watchlisted_at', 'rating']
 
-        print(f"[+] Done! Saved to {csv_filename}")
+        if split_size and split_size > 0:
+            print(f"[*] Splitting CSV into parts of {split_size} rows...")
+            base_name = csv_filename.rsplit('.', 1)[0]
+            ext = csv_filename.rsplit('.', 1)[1]
+            
+            for i in range(0, len(export_data), split_size):
+                part_num = (i // split_size) + 1
+                part_filename = f"{base_name}_part_{part_num}.{ext}"
+                chunk = export_data[i:i + split_size]
+                
+                with open(part_filename, mode='w', newline='', encoding='utf-8') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(chunk)
+                print(f"[+] Part {part_num} saved to {part_filename}")
+        else:
+            with open(csv_filename, mode='w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(export_data)
+            print(f"[+] Done! Saved to {csv_filename}")
