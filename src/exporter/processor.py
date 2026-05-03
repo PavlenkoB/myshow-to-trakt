@@ -183,12 +183,11 @@ class DataProcessor:
         print(f"[*] Stage 4: Exporting {total_rows} items to CSV...")
         pbar = tqdm(total=total_rows, desc="Exporting")
         
-        current_time_iso = datetime.now().strftime("%Y-%m-%dT12:00:00.000Z")
+        current_time_iso = datetime.now().strftime("%Y-%m-%dT12:00:00Z")
 
         for show_id_int in active_ids:
             show_id = str(show_id_int)
             meta = shows_data.get(show_id, {})
-            title = meta.get('title')
             imdb_id = meta.get('imdb_id') or self.cache.get(show_id)
             rating = (meta.get('rating', 0) * 2) if meta.get('rating') else ''
             watched_eps = episodes_data.get(show_id, [])
@@ -199,13 +198,12 @@ class DataProcessor:
                 if ep.get('date'):
                     try:
                         dt = datetime.strptime(ep['date'], "%d.%m.%Y")
-                        watched_at = dt.strftime("%Y-%m-%dT12:00:00.000Z")
+                        watched_at = dt.strftime("%Y-%m-%dT12:00:00Z")
                     except ValueError:
                         pass
                 
                 export_data.append({
                     'imdb_id': imdb_id or '',
-                    'title': title,
                     'type': 'episode',
                     'season': ep.get('s', ''),
                     'episode': ep.get('e', ''),
@@ -220,7 +218,6 @@ class DataProcessor:
             if meta.get('watchStatus') == 'later' and not watched_eps:
                 export_data.append({
                     'imdb_id': imdb_id or '',
-                    'title': title,
                     'type': 'show',
                     'season': '',
                     'episode': '',
@@ -232,7 +229,7 @@ class DataProcessor:
                 pbar.update(1)
         pbar.close()
 
-        fieldnames = ['imdb_id', 'type', 'watched_at', 'watchlisted_at', 'rating', 'rated_at', 'title', 'season', 'episode']
+        fieldnames = ['imdb_id', 'type', 'season', 'episode', 'watched_at', 'watchlisted_at', 'rating', 'rated_at']
 
         if split_size and split_size > 0:
             print(f"[*] Splitting CSV into parts of {split_size} rows...")

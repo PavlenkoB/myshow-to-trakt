@@ -10,13 +10,12 @@ To ensure accurate matching and metadata processing, your CSV should use the fol
 | :--- | :--- | :--- | :--- |
 | `imdb_id` | The ID of the item. Can also be `trakt_id`, `tmdb_id`, or `tvdb_id`. | Required | `tt0439100` |
 | `type` | Entry type: `movie`, `show`, `season`, or `episode`. | Recommended | `episode` |
+| `season` | Season number (numeric). | For episodes | `1` |
+| `episode` | Episode number (numeric). | For episodes | `5` |
 | `watched_at` | Date and time the item was watched (ISO 8601). Can be `unknown`. | For History | `2024-12-17T12:00:00Z` |
 | `watchlisted_at` | Date and time the item was added to your watchlist (ISO 8601). | For Watchlist | `2024-12-17T12:00:00Z` |
 | `rating` | Your rating for the item (1–10). | Optional | `10` |
 | `rated_at` | Date and time the item was rated (ISO 8601). Requires `rating`. | Optional | `2024-12-17T12:00:00Z` |
-| `title` | Title of the show (used as fallback for matching). | Recommended | `Breaking Bad` |
-| `season` | Season number (numeric). | For episodes | `1` |
-| `episode` | Episode number (numeric). | For episodes | `5` |
 
 ## Key Requirements
 
