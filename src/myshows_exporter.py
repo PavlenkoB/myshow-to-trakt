@@ -1,9 +1,9 @@
 import os
 from dotenv import load_dotenv
-from src.exporter.session import SessionManager
-from src.exporter.scraper import IMDbScraper
-from src.exporter.cache import IMDbCache, StateCache
-from src.exporter.processor import DataProcessor
+from exporter.session import SessionManager
+from exporter.scraper import IMDbScraper
+from exporter.cache import IMDbCache, StateCache
+from exporter.processor import DataProcessor
 
 # Load environment variables
 load_dotenv()
@@ -22,6 +22,9 @@ USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 # ================
 
 def main():
+    # 0. Ensure tmp directory exists
+    os.makedirs('tmp', exist_ok=True)
+    
     # 1. Initialize session
     manager = SessionManager(USER_AGENT)
     if not manager.login(USERNAME, PASSWORD, SESSION_COOKIE):

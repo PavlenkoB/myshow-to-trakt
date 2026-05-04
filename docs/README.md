@@ -1,5 +1,8 @@
 # Documentation Overview
 
+[![pipeline status](https://gitlab.com/PavlenkoB/myshow-to-trakt/badges/main/pipeline.svg)](https://gitlab.com/PavlenkoB/myshow-to-trakt/-/commits/main)
+[![coverage report](https://gitlab.com/PavlenkoB/myshow-to-trakt/badges/main/coverage.svg)](https://gitlab.com/PavlenkoB/myshow-to-trakt/-/commits/main)
+
 This directory contains technical documentation for the MyShows to Trakt migration tool.
 
 ## Subdirectories

@@ -96,11 +96,11 @@ class DataProcessor:
                     imdb_id = meta.get('imdbId')
                     if imdb_id:
                         imdb_str = str(imdb_id)
-                        if not imdb_str.startswith('tt'):
-                            # Pad to 7 digits (standard IMDb ID length)
-                            imdb_id = f"tt{imdb_str.zfill(7)}"
+                        if imdb_str.startswith('tt'):
+                            num_part = imdb_str[2:]
+                            imdb_id = f"tt{num_part.zfill(7)}"
                         else:
-                            imdb_id = imdb_str
+                            imdb_id = f"tt{imdb_str.zfill(7)}"
                     
                     shows_data[str_sid] = {
                         'title': meta.get('title'),
@@ -142,7 +142,8 @@ class DataProcessor:
                                 matched_eps.append({
                                     's': mapping['s'],
                                     'e': mapping['e'],
-                                    'date': info.get('watchDate')
+                                    'date': info.get('watchDate'),
+                                    'rating': info.get('rating')
                                 })
                     
                     episodes_data[str_sid] = matched_eps
@@ -189,7 +190,7 @@ class DataProcessor:
             show_id = str(show_id_int)
             meta = shows_data.get(show_id, {})
             imdb_id = meta.get('imdb_id') or self.cache.get(show_id)
-            rating = (meta.get('rating', 0) * 2) if meta.get('rating') else ''
+            show_rating = (meta.get('rating', 0) * 2) if meta.get('rating') else ''
             watched_eps = episodes_data.get(show_id, [])
             
             # Episodes
@@ -202,6 +203,8 @@ class DataProcessor:
                     except ValueError:
                         pass
                 
+                ep_rating = (ep.get('rating', 0) * 2) if ep.get('rating') else ''
+                
                 export_data.append({
                     'imdb_id': imdb_id or '',
                     'type': 'episode',
@@ -209,8 +212,8 @@ class DataProcessor:
                     'episode': ep.get('e', ''),
                     'watched_at': watched_at,
                     'watchlisted_at': watched_at,
-                    'rating': rating,
-                    'rated_at': watched_at if rating else ''
+                    'rating': ep_rating,
+                    'rated_at': watched_at if ep_rating else ''
                 })
                 pbar.update(1)
             
@@ -223,7 +226,7 @@ class DataProcessor:
                     'episode': '',
                     'watched_at': '',
                     'watchlisted_at': current_time_iso,
-                    'rating': '',
+                    'rating': show_rating,
                     'rated_at': ''
                 })
                 pbar.update(1)
@@ -233,8 +236,12 @@ class DataProcessor:
 
         if split_size and split_size > 0:
             print(f"[*] Splitting CSV into parts of {split_size} rows...")
-            base_name = csv_filename.rsplit('.', 1)[0]
-            ext = csv_filename.rsplit('.', 1)[1]
+            if '.' in csv_filename:
+                base_name = csv_filename.rsplit('.', 1)[0]
+                ext = csv_filename.rsplit('.', 1)[1]
+            else:
+                base_name = csv_filename
+                ext = 'csv'
             
             for i in range(0, len(export_data), split_size):
                 part_num = (i // split_size) + 1

@@ -20,9 +20,10 @@ class IMDbScraper:
             imdb_link = soup.find('a', href=lambda href: href and 'imdb.com/title/' in href)
             if imdb_link:
                 # Extract ttXXXXXXX via regex
-                match = re.search(r'tt\d+', imdb_link['href'])
+                match = re.search(r'tt(\d+)', imdb_link['href'])
                 if match:
-                    return match.group(0)
+                    num_part = match.group(1)
+                    return f"tt{num_part.zfill(7)}"
         except Exception:
             pass
         return None

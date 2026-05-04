@@ -1,9 +1,11 @@
-certifi==2026.4.22
-charset-normalizer==3.4.7
-idna==3.13
-requests==2.33.1
-urllib3==2.6.3
-python-dotenv
-beautifulsoup4
-lxml
-tqdm
+# Core Dependencies
+requests>=2.31.0
+python-dotenv>=1.0.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+tqdm>=4.66.0
+
+# Testing (Dev)
+pytest>=8.0.0
+pytest-mock>=3.12.0
+pytest-cov>=4.1.0
