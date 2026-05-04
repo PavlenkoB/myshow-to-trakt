@@ -1,5 +1,6 @@
 # Documentation Overview
 
+[![GitHub CI](https://github.com/PavlenkoB/myshow-to-trakt/actions/workflows/ci.yml/badge.svg)](https://github.com/PavlenkoB/myshow-to-trakt/actions/workflows/ci.yml)
 [![pipeline status](https://gitlab.com/PavlenkoB/myshow-to-trakt/badges/main/pipeline.svg)](https://gitlab.com/PavlenkoB/myshow-to-trakt/-/commits/main)
 [![coverage report](https://gitlab.com/PavlenkoB/myshow-to-trakt/badges/main/coverage.svg)](https://gitlab.com/PavlenkoB/myshow-to-trakt/-/commits/main)
 
