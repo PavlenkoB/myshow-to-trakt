@@ -14,24 +14,40 @@ class DataProcessor:
         self.ep_imdb_cache = ep_imdb_cache # Episode-level IMDb ID cache
 
     def fetch_imdb_episode_ids(self, show_imdb_id, season):
-        """Fetch episode IDs for a specific season from imdbapi.dev"""
-        url = f"https://api.imdbapi.dev/titles/{show_imdb_id}/episodes?season={season}&pageSize=50"
-        try:
-            time.sleep(0.5)
-            # Use clean requests to avoid session side-effects
-            resp = requests.get(url, timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                mapping = {}
-                for ep in data.get('episodes', []):
-                    ep_num = ep.get('episodeNumber')
-                    ep_id = ep.get('id')
-                    if ep_num is not None and ep_id:
-                        mapping[str(ep_num)] = ep_id
-                return mapping
-        except Exception as e:
-            print(f"[-] Error fetching episodes for {show_imdb_id} S{season}: {e}")
-        return None
+        """Fetch episode IDs for a specific season from imdbapi.dev with pagination support"""
+        base_url = f"https://api.imdbapi.dev/titles/{show_imdb_id}/episodes?season={season}&pageSize=50"
+        mapping = {}
+        next_page_token = None
+        pages_fetched = 0
+        max_pages = 10 # Safety limit
+
+        while pages_fetched < max_pages:
+            url = base_url
+            if next_page_token:
+                url += f"&pageToken={next_page_token}"
+            
+            try:
+                time.sleep(0.5)
+                resp = requests.get(url, timeout=15)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for ep in data.get('episodes', []):
+                        ep_num = ep.get('episodeNumber')
+                        ep_id = ep.get('id')
+                        if ep_num is not None and ep_id:
+                            mapping[str(ep_num)] = ep_id
+                    
+                    next_page_token = data.get('nextPageToken')
+                    if not next_page_token:
+                        break
+                    pages_fetched += 1
+                else:
+                    break
+            except Exception as e:
+                print(f"[-] Error fetching episodes for {show_imdb_id} S{season} (page {pages_fetched+1}): {e}")
+                break
+        
+        return mapping if mapping else None
 
     def fetch_show_list(self):
         print("[*] Fetching library from MyShows...")
@@ -142,9 +158,8 @@ class DataProcessor:
         to_fetch_watched = []
         for sid in base_list:
             str_sid = str(sid)
-            # Fetch if missing OR if empty list (but show has history)
-            watched_count = base_list[str_sid].get('watchedEpisodes', 0)
-            if str_sid not in episodes_data or (not episodes_data[str_sid] and watched_count > 0):
+            # Fetch if missing
+            if str_sid not in episodes_data:
                 to_fetch_watched.append(sid)
 
         if to_fetch_watched:
@@ -198,7 +213,9 @@ class DataProcessor:
             watched_eps = episodes_data.get(str_sid, [])
             for ep in watched_eps:
                 s = str(ep.get('s'))
-                if show_imdb_id not in ep_imdb_mapping or s not in ep_imdb_mapping[show_imdb_id]:
+                e = str(ep.get('e'))
+                # If season not in cache OR specific episode not in cache
+                if show_imdb_id not in ep_imdb_mapping or s not in ep_imdb_mapping[show_imdb_id] or e not in ep_imdb_mapping[show_imdb_id][s]:
                     if show_imdb_id not in required_seasons:
                         required_seasons[show_imdb_id] = set()
                     required_seasons[show_imdb_id].add(s)
@@ -280,15 +297,25 @@ class DataProcessor:
                 })
                 pbar.update(1)
             
-            # Watchlist (Only if later AND no episodes)
-            if meta.get('watchStatus') == 'later' and not watched_eps:
+            # Fallback for shows with no mapped episodes
+            if not watched_eps:
+                status = meta.get('watchStatus')
+                watched_at = ""
+                watchlisted_at = ""
+                
+                if status == 'finished':
+                    watched_at = 'unknown'
+                else:
+                    # later, watching, cancelled
+                    watchlisted_at = current_time_iso
+
                 export_data.append({
                     'imdb_id': show_imdb_id or '',
                     'type': 'show',
-                    'watched_at': '',
-                    'watchlisted_at': current_time_iso,
+                    'watched_at': watched_at,
+                    'watchlisted_at': watchlisted_at,
                     'rating': show_rating,
-                    'rated_at': ''
+                    'rated_at': current_time_iso if (show_rating and watched_at) else ''
                 })
                 pbar.update(1)
         pbar.close()
