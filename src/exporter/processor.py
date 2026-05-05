@@ -165,28 +165,29 @@ class DataProcessor:
         if to_fetch_watched:
             print(f"[*] Stage 2: Syncing watched episodes for {len(to_fetch_watched)} shows...")
             for show_id in tqdm(to_fetch_watched, desc="Episodes"):
+                str_sid = str(show_id)
                 watched_dict = self.fetch_watched_details(show_id)
-                if watched_dict:
-                    str_sid = str(show_id)
-                    matched_eps = []
+                matched_eps = []
+
+                if watched_dict and isinstance(watched_dict, dict):
                     show_meta = shows_data.get(str_sid, {})
                     ep_map = show_meta.get('ep_map', {})
-                    
-                    if isinstance(watched_dict, dict):
-                        for eid, info in watched_dict.items():
-                            mapping = ep_map.get(str(eid))
-                            if mapping:
-                                matched_eps.append({
-                                    's': mapping['s'],
-                                    'e': mapping['e'],
-                                    'date': info.get('watchDate'),
-                                    'rating': info.get('rating')
-                                })
-                    
-                    episodes_data[str_sid] = matched_eps
-                    
-                    if len(episodes_data) % 10 == 0:
-                        self.episode_cache.save(episodes_data)
+                    for eid, info in watched_dict.items():
+                        mapping = ep_map.get(str(eid))
+                        if mapping:
+                            matched_eps.append({
+                                's': mapping['s'],
+                                'e': mapping['e'],
+                                'date': info.get('watchDate'),
+                                'rating': info.get('rating')
+                            })
+                
+                # Always save str_sid to episodes_data (even as empty list []) 
+                # to mark as "fetched" and prevent Stage 2 re-sync loop.
+                episodes_data[str_sid] = matched_eps
+                
+                if len(episodes_data) % 10 == 0:
+                    self.episode_cache.save(episodes_data)
             self.episode_cache.save(episodes_data)
         else:
             print("[+] Episode history is up to date.")
