@@ -43,6 +43,7 @@ A modular Python tool to export your MyShows.me library (Watch History and Watch
 ## Usage
 Run the main exporter script:
 ```bash
+source .venv/bin/activate  # macOS/Linux
 python src/myshows_exporter.py
 ```
 The final CSV will be saved to `tmp/myshows_export.csv`. If `CSV_SPLIT_SIZE` is set, it will automatically split the export into multiple parts.

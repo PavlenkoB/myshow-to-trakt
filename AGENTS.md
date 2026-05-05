@@ -17,13 +17,13 @@ These instructions are for AI development tools interacting with this codebase.
 ## Project Standards & Conventions
 
 ### 1. Data Processing
-* **IMDb IDs:** Must always be prefixed with `tt` and padded to at least 7 digits (e.g., `tt0439100`).
+* **IMDb IDs:** Must always be prefixed with `tt` and padded to at least 7 digits (e.g., `tt0439100`). Episode-level IDs are resolved via `imdbapi.dev`.
 * **Ratings:** Scale conversion from MyShows (1-5) to Trakt (1-10) is handled by multiplying by 2.
 * **Timestamps:** All timestamps must follow ISO 8601 format (`YYYY-MM-DDTHH:MM:SSZ`).
 
 ### 2. CSV Export Format
 * The export follows the official Trakt CSV import schema.
-* **Columns:** `imdb_id`, `type`, `season`, `episode`, `watched_at`, `watchlisted_at`, `rating`, `rated_at`.
+* **Columns:** `imdb_id`, `type`, `watched_at`, `watchlisted_at`, `rating`, `rated_at`.
 * **Watchlist Logic:** `type=show` entries are only created if the show status is `later` AND no episodes have been watched.
 * **Watchlisted At:** For episodes, `watchlisted_at` matches `watched_at`. For watchlist shows, it defaults to the current date/time.
 * **Rated At:** For episodes with a rating, `rated_at` matches `watched_at`.

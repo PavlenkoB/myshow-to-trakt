@@ -8,10 +8,8 @@ To ensure accurate matching and metadata processing, your CSV should use the fol
 
 | Header | Description | Required | Example |
 | :--- | :--- | :--- | :--- |
-| `imdb_id` | The ID of the item. Can also be `trakt_id`, `tmdb_id`, or `tvdb_id`. | Required | `tt0439100` |
+| `imdb_id` | The ID of the item. For episodes, this must be the episode-level IMDb ID. | Required | `tt10314540` |
 | `type` | Entry type: `movie`, `show`, `season`, or `episode`. | Recommended | `episode` |
-| `season` | Season number (numeric). | For episodes | `1` |
-| `episode` | Episode number (numeric). | For episodes | `5` |
 | `watched_at` | Date and time the item was watched (ISO 8601). Can be `unknown`. | For History | `2024-12-17T12:00:00Z` |
 | `watchlisted_at` | Date and time the item was added to your watchlist (ISO 8601). | For Watchlist | `2024-12-17T12:00:00Z` |
 | `rating` | Your rating for the item (1–10). | Optional | `10` |
@@ -20,11 +18,9 @@ To ensure accurate matching and metadata processing, your CSV should use the fol
 ## Key Requirements
 
 ### 1. IDs
-The ID should be prefixed with the service name. For example, if you are using IMDb IDs, the column header must be `imdb_id`. Trakt supports:
-*   `trakt_id`
-*   `imdb_id`
-*   `tmdb_id`
-*   `tvdb_id` (TV shows only)
+The ID column header must be `imdb_id` (or `trakt_id`, `tmdb_id`, `tvdb_id`).
+*   **Movies/Shows:** Use the IMDb ID of the title.
+*   **Episodes:** Use the specific IMDb ID for the episode itself.
 
 ### 2. Timestamps
 All dates must follow the **ISO 8601** standard (`YYYY-MM-DDTHH:MM:SSZ`).

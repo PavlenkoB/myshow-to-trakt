@@ -1,15 +1,37 @@
 import csv
 import time
+import requests
 from datetime import datetime
 from tqdm import tqdm
 
 class DataProcessor:
-    def __init__(self, session, scraper, cache, state_cache, episode_cache):
+    def __init__(self, session, scraper, cache, state_cache, episode_cache, ep_imdb_cache):
         self.session = session
         self.scraper = scraper
         self.cache = cache # IMDb cache
         self.state_cache = state_cache # Show metadata cache
         self.episode_cache = episode_cache # Watched episodes cache
+        self.ep_imdb_cache = ep_imdb_cache # Episode-level IMDb ID cache
+
+    def fetch_imdb_episode_ids(self, show_imdb_id, season):
+        """Fetch episode IDs for a specific season from imdbapi.dev"""
+        url = f"https://api.imdbapi.dev/titles/{show_imdb_id}/episodes?season={season}&pageSize=50"
+        try:
+            time.sleep(0.5)
+            # Use clean requests to avoid session side-effects
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                mapping = {}
+                for ep in data.get('episodes', []):
+                    ep_num = ep.get('episodeNumber')
+                    ep_id = ep.get('id')
+                    if ep_num is not None and ep_id:
+                        mapping[str(ep_num)] = ep_id
+                return mapping
+        except Exception as e:
+            print(f"[-] Error fetching episodes for {show_imdb_id} S{season}: {e}")
+        return None
 
     def fetch_show_list(self):
         print("[*] Fetching library from MyShows...")
@@ -163,11 +185,45 @@ class DataProcessor:
                 if imdb_id:
                     self.cache.set(show_id, imdb_id)
 
+        # Stage 3.5: Episode IMDb ID Sync
+        ep_imdb_mapping = self.ep_imdb_cache.load() or {}
+        required_seasons = {} # {show_imdb_id: set(seasons)}
+        
+        for sid in base_list:
+            str_sid = str(sid)
+            show_imdb_id = shows_data.get(str_sid, {}).get('imdb_id') or self.cache.get(sid)
+            if not show_imdb_id:
+                continue
+            
+            watched_eps = episodes_data.get(str_sid, [])
+            for ep in watched_eps:
+                s = str(ep.get('s'))
+                if show_imdb_id not in ep_imdb_mapping or s not in ep_imdb_mapping[show_imdb_id]:
+                    if show_imdb_id not in required_seasons:
+                        required_seasons[show_imdb_id] = set()
+                    required_seasons[show_imdb_id].add(s)
+
+        if required_seasons:
+            total_seasons = sum(len(s) for s in required_seasons.values())
+            print(f"[*] Stage 3.5: Syncing episode IMDb IDs for {total_seasons} seasons...")
+            pbar = tqdm(total=total_seasons, desc="Syncing IDs")
+            for show_imdb_id, seasons in required_seasons.items():
+                if show_imdb_id not in ep_imdb_mapping:
+                    ep_imdb_mapping[show_imdb_id] = {}
+                for s in seasons:
+                    mapping = self.fetch_imdb_episode_ids(show_imdb_id, s)
+                    if mapping:
+                        ep_imdb_mapping[show_imdb_id][s] = mapping
+                    pbar.update(1)
+                self.ep_imdb_cache.save(ep_imdb_mapping)
+            pbar.close()
+
         # Stage 4: CSV Export
         export_data = []
         active_ids = sorted(base_list.keys(), key=int)
         
         total_rows = 0
+        skipped_episodes = 0
         for sid in active_ids:
             str_sid = str(sid)
             watched_eps = episodes_data.get(str_sid, [])
@@ -189,12 +245,21 @@ class DataProcessor:
         for show_id_int in active_ids:
             show_id = str(show_id_int)
             meta = shows_data.get(show_id, {})
-            imdb_id = meta.get('imdb_id') or self.cache.get(show_id)
+            show_imdb_id = meta.get('imdb_id') or self.cache.get(show_id)
             show_rating = (meta.get('rating', 0) * 2) if meta.get('rating') else ''
             watched_eps = episodes_data.get(show_id, [])
             
             # Episodes
             for ep in watched_eps:
+                s = str(ep.get('s'))
+                e = str(ep.get('e'))
+                ep_imdb_id = ep_imdb_mapping.get(show_imdb_id, {}).get(s, {}).get(e)
+                
+                if not ep_imdb_id:
+                    skipped_episodes += 1
+                    pbar.update(1)
+                    continue
+
                 watched_at = ""
                 if ep.get('date'):
                     try:
@@ -206,10 +271,8 @@ class DataProcessor:
                 ep_rating = (ep.get('rating', 0) * 2) if ep.get('rating') else ''
                 
                 export_data.append({
-                    'imdb_id': imdb_id or '',
+                    'imdb_id': ep_imdb_id,
                     'type': 'episode',
-                    'season': ep.get('s', ''),
-                    'episode': ep.get('e', ''),
                     'watched_at': watched_at,
                     'watchlisted_at': watched_at,
                     'rating': ep_rating,
@@ -220,10 +283,8 @@ class DataProcessor:
             # Watchlist (Only if later AND no episodes)
             if meta.get('watchStatus') == 'later' and not watched_eps:
                 export_data.append({
-                    'imdb_id': imdb_id or '',
+                    'imdb_id': show_imdb_id or '',
                     'type': 'show',
-                    'season': '',
-                    'episode': '',
                     'watched_at': '',
                     'watchlisted_at': current_time_iso,
                     'rating': show_rating,
@@ -232,7 +293,10 @@ class DataProcessor:
                 pbar.update(1)
         pbar.close()
 
-        fieldnames = ['imdb_id', 'type', 'season', 'episode', 'watched_at', 'watchlisted_at', 'rating', 'rated_at']
+        if skipped_episodes > 0:
+            print(f"[!] Warning: Skipped {skipped_episodes} episodes because their IMDb IDs could not be resolved.")
+
+        fieldnames = ['imdb_id', 'type', 'watched_at', 'watchlisted_at', 'rating', 'rated_at']
 
         if split_size and split_size > 0:
             print(f"[*] Splitting CSV into parts of {split_size} rows...")
