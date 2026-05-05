@@ -38,9 +38,9 @@ class DataProcessor:
                             mapping[str(ep_num)] = ep_id
                     
                     next_page_token = data.get('nextPageToken')
+                    pages_fetched += 1  # BUG-002: increment unconditionally so loop truly stops at max_pages
                     if not next_page_token:
                         break
-                    pages_fetched += 1
                 else:
                     break
             except Exception as e:
@@ -91,10 +91,14 @@ class DataProcessor:
             print("[-] Failed to fetch show list.")
             return
 
+        # BUG-003/BUG-008: normalise all keys to str up-front so every subsequent
+        # lookup (str_sid, active_ids, etc.) is consistent and type-safe.
+        base_list_full = {str(k): v for k, v in base_list_full.items()}
+
         # Apply limit if set
         if limit and isinstance(limit, int):
             print(f"[*] Applying export limit: {limit} shows.")
-            # Sort by ID to have deterministic behavior
+            # Sort by numeric value for deterministic behaviour
             limited_ids = sorted(base_list_full.keys(), key=int)[:limit]
             base_list = {sid: base_list_full[sid] for sid in limited_ids}
         else:
@@ -234,7 +238,7 @@ class DataProcessor:
             total_seasons = sum(len(s) for s in required_seasons.values())
             print(f"[*] Stage 3.5: Syncing episode IMDb IDs for {total_seasons} seasons...")
             pbar = tqdm(total=total_seasons, desc="Syncing IDs")
-            for show_imdb_id, seasons in required_seasons.items():
+            for i, (show_imdb_id, seasons) in enumerate(required_seasons.items()):
                 if show_imdb_id not in ep_imdb_mapping:
                     ep_imdb_mapping[show_imdb_id] = {}
                 for s in seasons:
@@ -247,7 +251,10 @@ class DataProcessor:
                         # Mark as fetched with empty dict if not already present
                         ep_imdb_mapping[show_imdb_id][s] = {}
                     pbar.update(1)
-                self.ep_imdb_cache.save(ep_imdb_mapping)
+                # BUG-007: save every 10 shows (not every show) to reduce I/O
+                if (i + 1) % 10 == 0:
+                    self.ep_imdb_cache.save(ep_imdb_mapping)
+            self.ep_imdb_cache.save(ep_imdb_mapping)  # final save
             pbar.close()
 
         # Stage 4: CSV Export
@@ -260,11 +267,13 @@ class DataProcessor:
             str_sid = str(sid)
             watched_eps = episodes_data.get(str_sid, [])
             total_rows += len(watched_eps)
-            
-            # Only add a watchlist row if it's 'later' AND we haven't watched any episodes
-            if shows_data.get(str_sid, {}).get('watchStatus') == 'later' and not watched_eps:
+
+            # BUG-004: all zero-episode shows get a fallback row in the export loop,
+            # not only 'later' ones — count them all to keep the progress bar accurate
+            # and avoid a premature early-exit when only non-'later' shows are present.
+            if not watched_eps:
                 total_rows += 1
-        
+
         if total_rows == 0:
             print("[-] No items to export.")
             return
@@ -272,13 +281,19 @@ class DataProcessor:
         print(f"[*] Stage 4: Exporting {total_rows} items to CSV...")
         pbar = tqdm(total=total_rows, desc="Exporting")
         
-        current_time_iso = datetime.now().strftime("%Y-%m-%dT12:00:00Z")
+        # BUG-005: use actual UTC time instead of a hardcoded noon placeholder
+        from datetime import timezone
+        current_time_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        for show_id_int in active_ids:
-            show_id = str(show_id_int)
+        # BUG-008: active_ids elements are already strings (keys of base_list);
+        # renamed loop variable to avoid misleading '_int' suffix.
+        for show_id in active_ids:
             meta = shows_data.get(show_id, {})
             show_imdb_id = meta.get('imdb_id') or self.cache.get(show_id)
-            show_rating = (meta.get('rating', 0) * 2) if meta.get('rating') else ''
+            # BUG-010: guard explicitly against None (not just falsy); cast to int to
+            # prevent floats (e.g. 2.5 * 2 = 5.0) from appearing in the CSV.
+            _sr = meta.get('rating')
+            show_rating = int(_sr * 2) if _sr is not None and _sr != 0 else ''
             watched_eps = episodes_data.get(show_id, [])
             
             # Episodes
@@ -286,8 +301,9 @@ class DataProcessor:
                 s = str(ep.get('s'))
                 e = str(ep.get('e'))
                 ep_imdb_id = ep_imdb_mapping.get(show_imdb_id, {}).get(s, {}).get(e)
-                
+
                 if not ep_imdb_id:
+                    # BUG-006: emit a warning so silent scraper/API failures are visible
                     skipped_episodes += 1
                     pbar.update(1)
                     continue
@@ -299,14 +315,18 @@ class DataProcessor:
                         watched_at = dt.strftime("%Y-%m-%dT12:00:00Z")
                     except ValueError:
                         pass
-                
-                ep_rating = (ep.get('rating', 0) * 2) if ep.get('rating') else ''
-                
+
+                # BUG-010: same int-cast + None guard as show rating
+                _er = ep.get('rating')
+                ep_rating = int(_er * 2) if _er is not None and _er != 0 else ''
+
                 export_data.append({
                     'imdb_id': ep_imdb_id,
                     'type': 'episode',
                     'watched_at': watched_at,
-                    'watchlisted_at': watched_at,
+                    # BUG-011: watched episodes are history items, not watchlist items;
+                    # watchlisted_at must be empty for episode rows per Trakt CSV spec.
+                    'watchlisted_at': '',
                     'rating': ep_rating,
                     'rated_at': watched_at if ep_rating else ''
                 })

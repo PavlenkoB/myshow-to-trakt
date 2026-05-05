@@ -15,7 +15,15 @@ class SessionManager:
                 if '=' in cookie:
                     name, value = cookie.strip().split('=', 1)
                     self.session.cookies.set(name, value, domain='myshows.me')
-            return True
+            # BUG-009: verify the cookie is still valid before proceeding
+            try:
+                resp = self.session.get("https://api.myshows.me/profile/", timeout=10)
+                if resp.status_code == 200:
+                    return True
+                print(f"[-] Cookie auth failed: server returned {resp.status_code}. Cookie may be expired.")
+            except requests.RequestException as e:
+                print(f"[-] Network error during cookie verification: {e}")
+            return False
 
         if not username or not password:
             print("[-] Error: Missing credentials.")

@@ -9,7 +9,8 @@ def mock_deps():
         'scraper': MagicMock(),
         'cache': MagicMock(),
         'state_cache': MagicMock(),
-        'episode_cache': MagicMock()
+        'episode_cache': MagicMock(),
+        'ep_imdb_cache': MagicMock(),  # BUG-001: was missing, caused TypeError on every test
     }
 
 def test_imdb_id_padding_in_metadata(mock_deps):
@@ -76,6 +77,8 @@ def test_rating_scaling_in_export(mock_deps, tmp_path):
             # Episode rating 4 * 2 = 8
             assert rows[0]['rating'] == '8'
             assert rows[0]['rated_at'] == '2024-01-01T12:00:00Z'
+            # BUG-011: watchlisted_at must be empty for episode (history) rows
+            assert rows[0]['watchlisted_at'] == ''
 
 def test_watchlist_export(mock_deps, tmp_path):
     csv_file = tmp_path / "watchlist.csv"
