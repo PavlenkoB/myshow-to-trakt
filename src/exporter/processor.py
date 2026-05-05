@@ -230,8 +230,13 @@ class DataProcessor:
                     ep_imdb_mapping[show_imdb_id] = {}
                 for s in seasons:
                     mapping = self.fetch_imdb_episode_ids(show_imdb_id, s)
-                    if mapping:
+                    # Always update mapping for the season to prevent re-sync loop,
+                    # even if mapping is empty (e.g., API has no data for this season).
+                    if mapping is not None:
                         ep_imdb_mapping[show_imdb_id][s] = mapping
+                    elif s not in ep_imdb_mapping[show_imdb_id]:
+                        # Mark as fetched with empty dict if not already present
+                        ep_imdb_mapping[show_imdb_id][s] = {}
                     pbar.update(1)
                 self.ep_imdb_cache.save(ep_imdb_mapping)
             pbar.close()
