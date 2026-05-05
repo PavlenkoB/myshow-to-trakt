@@ -13,34 +13,34 @@ def mock_deps():
         'ep_imdb_cache': MagicMock(),  # BUG-001: was missing, caused TypeError on every test
     }
 
-def test_imdb_id_padding_in_metadata(mock_deps):
+def test_imdb_id_padding_in_metadata(mock_deps, tmp_path):
+    csv_file = tmp_path / "test.csv"
     processor = DataProcessor(**mock_deps)
-    
+
     # Mock MyShows API response with short IMDb ID
     mock_meta = {
         'title': 'Test Show',
         'imdbId': '1234',
         'episodes': {}
     }
-    
+
     # We'll test the logic inside process_all indirectly or test the internal processing
     # But let's check how processor handles padding
-    
+
     # Manually trigger the padding logic check if possible or mock the fetch
     with patch.object(processor, 'fetch_metadata', return_value=mock_meta):
         with patch.object(processor, 'fetch_show_list', return_value={'1': {'watchStatus': 'watching'}}):
             # We just want to see if it saves correctly
             processor.state_cache.load.return_value = {}
             processor.episode_cache.load.return_value = {}
-            
+
             # Run Stage 1 logic (Metadata)
-            processor.process_all('tmp/test.csv', limit=1)
-            
+            processor.process_all(str(csv_file), limit=1)
+
             # Check what was saved to state_cache
             args, _ = processor.state_cache.save.call_args
             saved_data = args[0]
             assert saved_data['1']['imdb_id'] == "tt0001234"
-
 def test_rating_scaling_in_export(mock_deps, tmp_path):
     csv_file = tmp_path / "export.csv"
     processor = DataProcessor(**mock_deps)
