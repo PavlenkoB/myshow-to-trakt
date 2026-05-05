@@ -351,6 +351,9 @@ class DataProcessor:
                 writer.writerows(export_data)
             print(f"[+] Done! Saved to {csv_filename}")
         
-        exported_shows = len(set(row['imdb_id'] for row in export_data if row['type'] == 'show'))
         exported_episodes = sum(1 for row in export_data if row['type'] == 'episode')
-        print(f"[*] Export summary: {exported_shows} shows and {exported_episodes} episodes.")
+        # Total shows = fallback 'show' rows + shows that have at least one episode
+        # But easier to track unique show-level IMDb IDs before/during loop.
+        # Let's count how many distinct show IDs were processed and resulted in at least one row.
+        processed_shows = len(active_ids)
+        print(f"[*] Export summary: {processed_shows} shows and {exported_episodes} episodes.")
