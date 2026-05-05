@@ -204,6 +204,7 @@ class DataProcessor:
         # Stage 3.5: Episode IMDb ID Sync
         ep_imdb_mapping = self.ep_imdb_cache.load() or {}
         required_seasons = {} # {show_imdb_id: set(seasons)}
+        debug_count = 0
         
         for sid in base_list:
             str_sid = str(sid)
@@ -215,11 +216,19 @@ class DataProcessor:
             for ep in watched_eps:
                 s = str(ep.get('s'))
                 e = str(ep.get('e'))
-                # If season not in cache OR specific episode not in cache
-                if show_imdb_id not in ep_imdb_mapping or s not in ep_imdb_mapping[show_imdb_id] or e not in ep_imdb_mapping[show_imdb_id][s]:
+                # If season NOT in cache, we definitely need it.
+                # If season IS in cache, we don't re-fetch even if episode 'e' is missing,
+                # because an empty or partial mapping means the API didn't have that episode.
+                if show_imdb_id not in ep_imdb_mapping or s not in ep_imdb_mapping[show_imdb_id]:
                     if show_imdb_id not in required_seasons:
                         required_seasons[show_imdb_id] = set()
-                    required_seasons[show_imdb_id].add(s)
+                    
+                    if s not in required_seasons[show_imdb_id]:
+                        required_seasons[show_imdb_id].add(s)
+                        if debug_count < 5:
+                            title = shows_data.get(str_sid, {}).get('title', 'Unknown')
+                            # print(f"[DEBUG] Season {s} required for '{title}' (IMDb: {show_imdb_id}). Episode {e} not in cache.")
+                            debug_count += 1
 
         if required_seasons:
             total_seasons = sum(len(s) for s in required_seasons.values())
