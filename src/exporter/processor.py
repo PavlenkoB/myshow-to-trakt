@@ -350,3 +350,7 @@ class DataProcessor:
                 writer.writeheader()
                 writer.writerows(export_data)
             print(f"[+] Done! Saved to {csv_filename}")
+        
+        exported_shows = len(set(row['imdb_id'] for row in export_data if row['type'] == 'show'))
+        exported_episodes = sum(1 for row in export_data if row['type'] == 'episode')
+        print(f"[*] Export summary: {exported_shows} shows and {exported_episodes} episodes.")
